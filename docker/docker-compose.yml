@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Database PostgreSQL 15
+  postgres:
+    image: postgres:15-alpine
+    container_name: benchmark-postgres
+    environment:
+      POSTGRES_DB: benchmarkdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../benchmark/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Time Series DB for JMeter results
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: benchmark-influxdb
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: adminpassword123
+      DOCKER_INFLUXDB_INIT_ORG: perf
+      DOCKER_INFLUXDB_INIT_BUCKET: jmeter
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: perf-secret-token-12345
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdata:/var/lib/influxdb2
+
+  # Prometheus JVM & System Metrics Scraper
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: benchmark-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  # Grafana Dashboards (JVM & JMeter)
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: benchmark-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafanadata:/var/lib/grafana
+
+volumes:
+  pgdata:
+  influxdata:
+  grafanadata:
